@@ -5,7 +5,6 @@
   require_once(ROOT_PATH.'/PHP/dati-cloudant.php');
   require_once(ROOT_PATH.'/PHP/DB_Manager.php');
 
-  
   $DB = new DB_Manager();
   if($DB->connect()==false) {
   	    echo("Errore di connessione al DB");
@@ -17,20 +16,45 @@
   /*******************************************************************************
    1) Estraggo i nuovi dati dal DB Mysql e li metto in documenti opportuni
   ********************************************************************************/ 
+
+  if($DB->getFlagUpdate()==0){  
+   echo("NON CI SONO DATI DA ELABORARE!!!\r\n");
+   exit();
+  }
   $new_data = $DB->getNewData();
+  /*
+    $new_data[i][0]=>sensor_id_cluster 
+    $new_data[i][1]=>sensor_id_sensor 
+    $new_data[i][2]=>timestamp_misura
+    $new_data[i][3]=>timestamp_insert
+    $new_data[i][4]=>num_sample
+    $new_data[i][5]=>f_sampling
+    $new_data[i][6]=>data
+    $new_data[i][7]=>tab_len
+    $new_data[i][8]=>data_len
+  */
   $jj=0;
   $date = date_create();
   foreach($new_data as $key=>$value)
   {
-	  	$data = $value[6];	  	
+                echo($value[0]);
+                echo($value[1]);
+                echo($value[2]);
+                echo($value[3]);
+
+	  	//$data = $value[6];	  	
+
+                /* Modifica DAL ZOTTO dell'OFFSET */
+//	  	$data = array_slice($value[6],$value[7],$value[8]);	  	
+                $data = substr($value[6],$value[7]);
+
 	  	/* 1   : COPIO I DATI RAW IN UN FILE PER SUCCESSIVA ELABORAZIONE */
                 /*      IL FILE GENERATO SARA' SEMPRE  "SIG_IDSENSOR_TIMESTAMP.dat" */ 
 	  	$sig1 = fopen("SEGNALI/SIG_".$value[1]."_".$value[2].".dat", 'wb');
 	  	fwrite($sig1, $data);
 	  	fclose($sig1);
 
-                /*2    : Calcolo i valori di noise Logger */
-              
+                /*2    : Calcolo i valori di noise Logger */              
 //	  	echo("octave --silent ./OCTAVE/NoiseLogger.m ./SEGNALI/SIG_".$value[1]."_".$value[2].".dat 1 ".$value[5]." > /dev/null");
 	  	exec("octave --silent ./OCTAVE/NoiseLogger.m ./SEGNALI/SIG_".$value[1]."_".$value[2].".dat 1 ".$value[5]." > /dev/null");
 
@@ -38,43 +62,46 @@
 	  	$new_doc->type                 = "misura";
 	  	$new_doc->id_cluster           = $value[0];
 	  	$new_doc->sensor               = $value[1];
-                date_timestamp_set($date, intval($value[2])/1000);
+//                date_timestamp_set($date, intval($value[2])/1000);
+                date_timestamp_set($date, intval($value[2]));
                 $new_doc->dataora              = date_format($date,'Y-m-d H:i:s');
-	  	$new_doc->timestamp_misura     = $value[2];
-	  	$new_doc->timestamp_insert     = $value[3];
-	  	$new_doc->num_sample           = $value[4];
+	  	$new_doc->timestamp_misura     = $value[2]."000";
+	  	$new_doc->timestamp_insert     = $value[3]."000";
+	  	$new_doc->num_sample           = $value[8];
 	  	$new_doc->f_sampling           = $value[5];
 
 	  	$sig1 = fopen("./frequenze_max.dat", 'rb');
 	  	$singolo = fread($sig1, 4);
-                $new_doc->freq_max = intval(unpack("l",$singolo));
+                $new_doc->freq_max = unpack("l",$singolo)[1];
 	  	fclose($sig1);
                 /*****************************************************************/  
 	  	$sig1 = fopen("./minimi_min.dat", 'rb');
 	  	$singolo = fread($sig1, 4);
-                $new_doc->minimi_min = intval(unpack("l",$singolo));
+                $new_doc->minimi_min = unpack("l",$singolo)[1];
 	  	fclose($sig1);
                 /*****************************************************************/  
                 $new_doc->frequenze = array();
 	  	$handle = fopen("./frequenze.dat", 'rb');
+                $singolo = fread($handle,4);
                 while (!feof($handle))
                 {
+                    array_push($new_doc->frequenze,unpack("l",$singolo)[1]);
                     $singolo = fread($handle,4);
-                    array_push($new_doc->frequenze,intval(unpack("l",$singolo)));
                 } 
 	  	fclose($handle);
                 /*****************************************************************/  
                 $new_doc->minimi = array();
 	  	$handle = fopen("./minimi.dat", 'rb');
+                $singolo = fread($handle,4);
                 while (!feof($handle))
                 {
+                    array_push($new_doc->minimi,unpack("l",$singolo)[1]);
                     $singolo = fread($handle,4);
-                    array_push($new_doc->minimi,intval(unpack("l",$singolo)));
                 } 
 	  	fclose($handle);
                 /*****************************************************************/ 
                 
-  	  	
+                  	  	
                 /*** 3- Inserisco il nuovo documento in cloudant ***/
 	  	$ris = $CLO->POST(baseUrl, db, $new_doc);
 	  	echo("\r\n".$ris);
@@ -87,7 +114,7 @@
 	  	
 	  	/* 1-  ATTACHMENT DATI RAW - estratti dal db */ 
 	  	$ris = $CLO->PUT_ATTACHMENT(baseUrl, db,$doc->id,$doc->rev,"dati.dat",$data);
-	  	echo("\r\nPUT ATTACHMENT 1 ==> ".$ris);
+	  	echo("\r\nPUT ATTACHMENT 1 DATI ==> ".$ris);
 	  	$doc = json_decode($ris);	  	
 	  	
 	  	
@@ -95,15 +122,18 @@
 	  	/* 3° : LANCIO OCTAVE CHE GENERA PLOT DATI 
                         che genera  plot.jpg
                 */
-	  	exec("octave --silent ./OCTAVE/PlotSignal.m ./SEGNALI/SIG_".$value[1]."_".$value[2].".dat ".$value[4]." ".$value[5]." > /dev/null");
+//	  	exec("octave --silent ./OCTAVE/PlotSignal.m ./SEGNALI/SIG_".$value[1]."_".$value[2].".dat ".$value[4]." ".$value[5]." > /dev/null");
+	  	exec("octave --silent ./OCTAVE/PlotSignalArosio.m ./SEGNALI/SIG_".$value[1]."_".$value[2].".dat ".$value[8]." ".$value[5]." > /dev/null");
 	  	
 	  	$data = $value[6];
 	  	$ris = $CLO->PUT_IMAGE(baseUrl, db, $doc->id, $doc->rev, "dati.jpg", "dati.jpg");
-	  	echo("\r\nPUT ATTACHMENT 2 ==> ".$ris);
+//	  	$ris = $CLO->PUT_IMAGE(baseUrl, db, $doc->id, $doc->rev, "dati.jpg", "dati.png");
+	  	echo("\r\nPUT ATTACHMENT 2 Grafico Arosio==> ".$ris);
 	  	$doc = json_decode($ris);
 	  	// 3° : LANCIO OCTAVE CHE GENERA PLOT FFT
-	  	exec("octave --silent ./OCTAVE/PlotFFT.m  ./SEGNALI/SIG_".$value[1]."_".$value[2].".dat ".$value[4]." ".$value[5]." > /dev/null");
-	  	 
+//	  	exec("octave --silent ./OCTAVE/PlotFFT.m  ./SEGNALI/SIG_".$value[1]."_".$value[2].".dat ".$value[4]." ".$value[5]." > /dev/null");
+	  	exec("octave --silent ./OCTAVE/PlotFFT.m  ./SEGNALI/SIG_".$value[1]."_".$value[2].".dat ".$value[8]." ".$value[5]." > /dev/null");
+
 	  	$data = $value[6];
 	  	$ris = $CLO->PUT_IMAGE(baseUrl, db, $doc->id, $doc->rev, "fft_dati.jpg", "fft_dati.jpg");
 	  	echo("\r\nPUT ATTACHMENT 3 ==> ".$ris);
@@ -116,20 +146,29 @@
 	  	exec("rm minimi_min.dat");
   	       
   	        $jj++;
-          //      $DB->SegnalaElaborati($key);
+    //            $DB->SegnalaElaborati($key);
  }
  
+echo("**********************************************************"); 
+echo("**********************************************************"); 
+echo("**********************************************************"); 
+echo("CALCOLO LE CORRELAZIONI");
+echo("**********************************************************"); 
+echo("**********************************************************"); 
+echo("**********************************************************"); 
 
- 
          /* Estraggo solo i dati da elaborare */
 	 $new_data = $DB->getNewData_Light();
         
 	 //$sens_corr = $DB->getSensorCorrelation();
+	 for($k=0;$k<count($new_data);$k++)
+         {
+            /* Flaggo la riga come elaborata */
+            $DB->SegnalaElaborati($new_data[$k][6]);
+         }
 
 	 for($k=0;$k<count($new_data)-1;$k++)
 	 {
-                /* Flaggo la riga come elaborata */
-                $DB->SegnalaElaborati($new_data[$k][6]);
 
    	        for($t=$k+1;$t<count($new_data);$t++)
 	 	{
@@ -158,6 +197,11 @@
                                   $new_doc->cluster2             = $new_data[$t][0];
                                   $new_doc->sensor2              = $new_data[$t][1];
 
+               	  	          $sig1 = fopen("MaxDelay.dat", 'rb');
+                   	  	  $singolo = fread($sig1, 4);
+                                  $new_doc->delay = unpack("f",$singolo)[1];
+	  	                  fclose($sig1);
+
 	 		   	  $ris = $CLO->POST(baseUrl, db, $new_doc);
  	 		   	  echo("\r\n".$ris);
 	 		   	  $doc = json_decode($ris);
@@ -169,6 +213,10 @@
 	 		   	  
 	 		   	  $ris = $CLO->PUT_IMAGE(baseUrl, db, $doc->id, $doc->rev, "CORR.jpg", "ImgCorrS1S2.jpg");
 	 		   	  echo("\r\nPUT ATTACHMENT 2 ==> ".$ris);
+	 		   	  $doc = json_decode($ris);
+
+	 		   	  $ris = $CLO->PUT_IMAGE(baseUrl, db, $doc->id, $doc->rev, "COHER.jpg", "COHER.jpg");
+	 		   	  echo("\r\nPUT ATTACHMENT 3 ==> ".$ris);
 	 		   	  $doc = json_decode($ris);
 	 		   	  
 	 		   	  

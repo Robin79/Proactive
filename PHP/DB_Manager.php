@@ -121,10 +121,19 @@ class DB_Manager
             $result = $this->mysqli->query($query);
         }
  	/*****************************************************************************************************************/
+        public function getFlagUpdate()
+        {
+          $query = " SELECT FlagUpdate FROM clusters WHERE id_cluster = 'CLUSTER1'";
+          $result = $this->mysqli->query($query);
+          $row = $result->fetch_array(MYSQLI_NUM);
+          return(intval($row[0]));
+        
+        }
+/*****************************************************************************/
 	public function getNewData()
 	{
 		$array = array();
-		$query = " SELECT id_insert,sensors_id_cluster,sensors_id_sensor,timestamp_misura,timestamp_insert,num_sample,f_sampling,data FROM raw_data_correlation WHERE elaborati=0";
+		$query = " SELECT id_insert,sensors_id_cluster,sensors_id_sensor,timestamp_misura,timestamp_insert,num_sample,f_sampling,data,tab_len,data_len FROM raw_data_correlation WHERE elaborati=0";
 		
 		$result = $this->mysqli->query($query);
 			
@@ -133,7 +142,7 @@ class DB_Manager
 			
 			while($row = $result->fetch_array(MYSQLI_NUM))
 			{
-				$array[$row[0]] = array($row[1],$row[2],$row[3],$row[4],$row[5],$row[6],$row[7]);				
+				$array[$row[0]] = array($row[1],$row[2],$row[3],$row[4],$row[5],$row[6],$row[7],$row[8],$row[9]);				
 			}
 			
 		}
@@ -144,7 +153,7 @@ class DB_Manager
 	public function getNewData_Light()
 	{
 		$array = array();
-		$query = " SELECT id_insert,sensors_id_cluster,sensors_id_sensor,timestamp_misura,num_sample,f_sampling,doc_id FROM raw_data_correlation WHERE elaborati=0";
+		$query = " SELECT id_insert,sensors_id_cluster,sensors_id_sensor,timestamp_misura,data_len,f_sampling,doc_id FROM raw_data_correlation WHERE elaborati=0";
 	
 		$result = $this->mysqli->query($query);
 		$k=0;	
