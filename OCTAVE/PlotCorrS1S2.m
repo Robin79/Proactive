@@ -1,4 +1,5 @@
 pkg load signal 
+addpath('./OCTAVE');
 
 args = argv;
 
@@ -15,17 +16,27 @@ printf("\n\r fnameCorrs1S2    : %s",fnameCorrS1S2);
 printf("\n\r fnameImgCorrS1S2 : %s",fnameImgCorrS1S2);
 printf("\n\r nsamples: %d",nsamples);
 
+%%% Leggo il primo file di segnale
 fileID  = fopen(fnameS1);
-signal1 = fread(fileID,'int32');
+signal1 = fread(fileID,'int8');
 fclose(fileID);
 
+%%% Leggo il secondoo file di segnale
 fileID  = fopen(fnameS2);
-signal2 = fread(fileID,'int32');
+signal2 = fread(fileID,'int8');
 fclose(fileID);
 
+dt=1/fsampling;
+max_lag = round(5/dt);
+
+%[vcorrS1S2,delaycorrS1S2] = xcorr(signal1,signal2,max_lag,'coeff');
 [vcorrS1S2,delaycorrS1S2] = xcorr(signal1,signal2);
 
-fileID = fopen(fnameCorrS1S2,'w');
+%[xcorr_max,xcorr_index]=max(vcorrS1S2);
+
+%delta_T = delaycorrS1S2(xcorr_index)*dt;
+
+fileID = fopen(fnameCorrS1S2,'wb');
 fwrite(fileID,vcorrS1S2,'float');
 fclose(fileID);
 
@@ -49,7 +60,6 @@ Ymiddle            = floor((VectXlim(1,1)+ VectXlim(1,2))/2);
 VectXTick          = [VectXlim(1,1),Ymiddle,VectXlim(1,2)]; 
 
 
-
 set(0,'DefaultFigureVisible','off');
 
 b1 = figure('PaperSize',[20.98 29.68]);
@@ -70,7 +80,7 @@ hold on;
 %set(ST1,'MarkerFaceColor','red');
 %set(ST1,'MarkerEdgeColor','blue');
 
-% metodo alternativo allo STEM 
+%metodo alternativo allo STEM 
 %plot([IndexMaxS1,IndexMaxS1],[0,MaxS1],'b');
 %plot(IndexMaxS1,MaxS1,'*r');
 
@@ -101,6 +111,11 @@ msgR1 = sprintf("   Signal1  : %s  n = %d fs=%d [Hz]", fnameS1,nsamples/2,fsampl
 msgR2 = sprintf("   Signal2  : %s  n = %d fs=%d [Hz]", fnameS2,nsamples/2,fsampling);
 msgR3 = sprintf("   Max : [%fs,%f]",delaycorrS1S2(IndexMaxS1)/fsampling,MaxS1);
 
+#delaycorrS1S2(IndexMaxS1)
+fileID = fopen('MaxDelay.dat','wb');
+fwrite(fileID,delaycorrS1S2(IndexMaxS1)/fsampling,'float');
+fclose(fileID);
+
 text (5, 1.15, msgR1);
 text (5, 1.1, msgR2);
 text (5, 1.05, msgR3);
@@ -108,3 +123,17 @@ text (5, 1.05, msgR3);
 
 print -djpg ImgCorrS1S2;
 
+%% Richiamo calcolo script Coerenza
+%% coherenceStandard, fft_signal1, fft_signal2, freqAx
+Coherence
+
+b1 = figure('PaperSize',[20.98 29.68]);
+plot(freqAx,coherenceStandard,'-g');
+hold on
+plot(freqAx,fft_signal1,'-r');
+plot(freqAx,fft_signal2,'-b');
+
+hold off
+xlabel('Frequency [Hz]');
+ylabel('Amplitude []');
+print -djpg COHER.jpg;

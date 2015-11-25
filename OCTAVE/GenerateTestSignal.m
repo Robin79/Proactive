@@ -17,12 +17,13 @@
 # disp(width);
 # disp(heigth);
 
- start = floor((nsample/2) - (width/2));
- stop = floor((nsample/2) + (width/2));
+# start = floor((nsample/2) - (width/2));
+# stop = floor((nsample/2) + (width/2));
 
-
- signal = ones(nsample,1)*(heigth/2);
- signal(start:stop,1) = heigth;
+# signal = ones(nsample,1)*(heigth/2);
+# signal(start:stop,1) = heigth;
+  
+  signal = (heigth*(rand(1,nsample)-.5));
 
  fileID = fopen(filename,'w');
  fwrite(fileID,signal,'int32');

@@ -8,9 +8,9 @@
 
  %%% Leggo dati dal file
  fileID  = fopen(fnameS1);
- signal1 = fread(fileID,'int32');
+%% signal1 = fread(fileID,'int32');
+ signal1 = fread(fileID,'int8');
  fclose(fileID);
-
 
  T = 1/Fs;
  ns = length(signal1);
@@ -22,16 +22,22 @@
 
  for i = 1:WinSample:ns-WinSample+1    
 
-     Vett_temp = signal1(i:i+WinSample-1);
-      minimi = [ minimi 20*log10(min(Vett_temp)) ];
+#      fprintf("%d -> %d\r\n",i,i+WinSample-1);
+      Vett_temp = signal1(i:i+WinSample-1);
 
-     [val_max,ind_max] =  max(abs(fft(Vett_temp)));
+      minimi = [ minimi (min(Vett_temp)) ];
+
+      spettro = abs(fft(Vett_temp-mean(Vett_temp)));
+      [val_max,ind_max] =  max(spettro);
       
-     freq_max = [ freq_max (ind_max-1)*df ];
+      freq_max = [ freq_max (ind_max-1)*df ];
 
  end
 
- %int32(minimi)
+# int32(mean(minimi))
+# int32(minimi)
+  int32(freq_max)
+
  %signal1 
 
  fileID = fopen('./frequenze_max.dat','w');
@@ -39,7 +45,7 @@
  fclose(fileID);
 
  fileID = fopen('./minimi_min.dat','w');
- fwrite(fileID,int32(20*log10(mean(minimi))),'int32');
+ fwrite(fileID,int32(mean(minimi)),'int32');
  fclose(fileID);
 
  fileID = fopen('./frequenze.dat','w');
@@ -47,7 +53,7 @@
  fclose(fileID);
 
  fileID = fopen('./minimi.dat','w');
- fwrite(fileID,minimi,'int32');
+ fwrite(fileID,int32(minimi),'int32');
  fclose(fileID);
 
 
