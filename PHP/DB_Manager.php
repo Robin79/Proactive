@@ -130,6 +130,12 @@ class DB_Manager
         
         }
 /*****************************************************************************/
+        public function setFlagUpdate()
+        {
+          $query = " UPDATE clusters SET  FlagUpdate=0 WHERE id_cluster = 'CLUSTER1'";
+          $result = $this->mysqli->query($query);        
+        }
+/*****************************************************************************/
 	public function getNewData()
 	{
 		$array = array();
